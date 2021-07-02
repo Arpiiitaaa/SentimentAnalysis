@@ -1,0 +1,731 @@
+from alpha_vantage.timeseries import TimeSeries
+import pandas as pd
+import numpy as np
+from statsmodels.tsa.arima_model import ARIMA
+from sklearn.metrics import mean_squared_error
+import matplotlib.pyplot as plt
+plt.style.use('ggplot')
+import math, random
+from datetime import datetime
+import datetime as dt
+import yfinance as yf
+import preprocessor as p
+import re
+from sklearn.linear_model import LinearRegression
+from textblob import TextBlob
+In [ ]:
+!pip install -r requirements.txt
+Collecting https://pypi.anaconda.org/berber/simple/tweet-preprocessor/0.5.0/tweet-preprocessor-0.5.0.tar.gz (from -r requirements.txt (line 16))
+  Downloading https://pypi.anaconda.org/berber/simple/tweet-preprocessor/0.5.0/tweet-preprocessor-0.5.0.tar.gz
+Requirement already satisfied: tensorflow==2.4.1 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 1)) (2.4.1)
+Collecting nltk==3.5
+  Downloading https://files.pythonhosted.org/packages/92/75/ce35194d8e3022203cca0d2f896dbb88689f9b3fce8e9f9cff942913519d/nltk-3.5.zip (1.4MB)
+     |████████████████████████████████| 1.4MB 4.3MB/s 
+Requirement already satisfied: keras==2.4.3 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 3)) (2.4.3)
+Requirement already satisfied: numpy==1.19.5 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 4)) (1.19.5)
+Collecting streamlit==0.52.1
+  Downloading https://files.pythonhosted.org/packages/1d/0a/9334362a9ec7f34d0d7d6846e3c54d09f9d97ab37325602414c6495535bc/streamlit-0.52.1-py2.py3-none-any.whl (4.4MB)
+     |████████████████████████████████| 4.4MB 33.8MB/s 
+Requirement already satisfied: seaborn==0.11.1 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 6)) (0.11.1)
+Requirement already satisfied: tweepy==3.10.0 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 7)) (3.10.0)
+Requirement already satisfied: textblob==0.15.3 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 8)) (0.15.3)
+Requirement already satisfied: flask==1.1.2 in /usr/local/lib/python3.7/dist-packages (from -r requirements.txt (line 9)) (1.1.2)
+Collecting pandas==1.2.2
+  Downloading https://files.pythonhosted.org/packages/4c/33/87b15a5baeeb71bd677da3579f907e97476c5247c0e56a37079843af5424/pandas-1.2.2-cp37-cp37m-manylinux1_x86_64.whl (9.9MB)
+     |████████████████████████████████| 9.9MB 28.3MB/s 
+Collecting matplotlib==3.2
+  Downloading https://files.pythonhosted.org/packages/6c/ab/e1585a7101f8f7047376b59274ada50fefd637bd4cd99d2125a1b730845a/matplotlib-3.2.0-cp37-cp37m-manylinux1_x86_64.whl (12.4MB)
+     |████████████████████████████████| 12.4MB 166kB/s 
+Collecting scikit_learn==0.24.1
+  Downloading https://files.pythonhosted.org/packages/f3/74/eb899f41d55f957e2591cde5528e75871f817d9fb46d4732423ecaca736d/scikit_learn-0.24.1-cp37-cp37m-manylinux2010_x86_64.whl (22.3MB)
+     |████████████████████████████████| 22.3MB 65.0MB/s 
+Collecting statsmodels==0.12.2
+  Downloading https://files.pythonhosted.org/packages/da/69/8eef30a6237c54f3c0b524140e2975f4b1eea3489b45eb3339574fc8acee/statsmodels-0.12.2-cp37-cp37m-manylinux1_x86_64.whl (9.5MB)
+     |████████████████████████████████| 9.5MB 33.3MB/s 
+Collecting yfinance==0.1.54
+  Downloading https://files.pythonhosted.org/packages/c2/31/8b374a12b90def92a4e27d0fc595fc43635f395984e36a075244d98bd265/yfinance-0.1.54.tar.gz
+Collecting alpha_vantage==2.3.1
+  Downloading https://files.pythonhosted.org/packages/ba/b4/d95f9e0eccea6732bab5a079772d453a4f0b68a9f63740d9cf320f92beaa/alpha_vantage-2.3.1-py3-none-any.whl
+Requirement already satisfied: google-pasta~=0.2 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (0.2.0)
+Requirement already satisfied: termcolor~=1.1.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.1.0)
+Requirement already satisfied: wrapt~=1.12.1 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.12.1)
+Requirement already satisfied: tensorboard~=2.4 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (2.4.1)
+Requirement already satisfied: h5py~=2.10.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (2.10.0)
+Requirement already satisfied: typing-extensions~=3.7.4 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (3.7.4.3)
+Requirement already satisfied: six~=1.15.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.15.0)
+Requirement already satisfied: wheel~=0.35 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (0.36.2)
+Requirement already satisfied: flatbuffers~=1.12.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.12)
+Requirement already satisfied: tensorflow-estimator<2.5.0,>=2.4.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (2.4.0)
+Requirement already satisfied: keras-preprocessing~=1.1.2 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.1.2)
+Requirement already satisfied: opt-einsum~=3.3.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (3.3.0)
+Requirement already satisfied: astunparse~=1.6.3 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.6.3)
+Requirement already satisfied: absl-py~=0.10 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (0.12.0)
+Requirement already satisfied: protobuf>=3.9.2 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (3.12.4)
+Requirement already satisfied: gast==0.3.3 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (0.3.3)
+Requirement already satisfied: grpcio~=1.32.0 in /usr/local/lib/python3.7/dist-packages (from tensorflow==2.4.1->-r requirements.txt (line 1)) (1.32.0)
+Requirement already satisfied: click in /usr/local/lib/python3.7/dist-packages (from nltk==3.5->-r requirements.txt (line 2)) (7.1.2)
+Requirement already satisfied: joblib in /usr/local/lib/python3.7/dist-packages (from nltk==3.5->-r requirements.txt (line 2)) (1.0.1)
+Requirement already satisfied: regex in /usr/local/lib/python3.7/dist-packages (from nltk==3.5->-r requirements.txt (line 2)) (2019.12.20)
+Requirement already satisfied: tqdm in /usr/local/lib/python3.7/dist-packages (from nltk==3.5->-r requirements.txt (line 2)) (4.41.1)
+Requirement already satisfied: scipy>=0.14 in /usr/local/lib/python3.7/dist-packages (from keras==2.4.3->-r requirements.txt (line 3)) (1.4.1)
+Requirement already satisfied: pyyaml in /usr/local/lib/python3.7/dist-packages (from keras==2.4.3->-r requirements.txt (line 3)) (3.13)
+Collecting watchdog
+  Downloading https://files.pythonhosted.org/packages/c6/ba/a36ca5b4e75649a002f06531862467b3eb5c768caa23d6d88b921fe238d8/watchdog-2.0.2-py3-none-manylinux2014_x86_64.whl (74kB)
+     |████████████████████████████████| 81kB 5.2MB/s 
+Collecting blinker
+  Downloading https://files.pythonhosted.org/packages/1b/51/e2a9f3b757eb802f61dc1f2b09c8c99f6eb01cf06416c0671253536517b6/blinker-1.4.tar.gz (111kB)
+     |████████████████████████████████| 112kB 52.6MB/s 
+Requirement already satisfied: future in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (0.16.0)
+Requirement already satisfied: requests in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (2.23.0)
+Collecting enum-compat
+  Downloading https://files.pythonhosted.org/packages/55/ae/467bc4509246283bb59746e21a1a2f5a8aecbef56b1fa6eaca78cd438c8b/enum_compat-0.0.3-py3-none-any.whl
+Requirement already satisfied: tornado<6.0,>=5.0 in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (5.1.1)
+Requirement already satisfied: tzlocal in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (1.5.1)
+Requirement already satisfied: astor in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (0.8.1)
+Requirement already satisfied: altair>=3.2.0 in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (4.1.0)
+Collecting python-dateutil<=2.8.0
+  Downloading https://files.pythonhosted.org/packages/41/17/c62faccbfbd163c7f57f3844689e3a78bae1f403648a6afb1d0866d87fbb/python_dateutil-2.8.0-py2.py3-none-any.whl (226kB)
+     |████████████████████████████████| 235kB 39.9MB/s 
+Collecting base58
+  Downloading https://files.pythonhosted.org/packages/b8/a1/d9f565e9910c09fd325dc638765e8843a19fa696275c16cc08cf3b0a3c25/base58-2.1.0-py3-none-any.whl
+Collecting boto3
+  Downloading https://files.pythonhosted.org/packages/9f/2d/f094ea90db0ede94ed85cf843da694e18343feed686241af86743f583b00/boto3-1.17.47-py2.py3-none-any.whl (131kB)
+     |████████████████████████████████| 133kB 43.3MB/s 
+Collecting botocore
+  Downloading https://files.pythonhosted.org/packages/d4/ea/f4a64444f6a4f222ceff3565528c2b9f96083da7bddcc3ef7e96ec5cd77a/botocore-1.20.47-py2.py3-none-any.whl (7.4MB)
+     |████████████████████████████████| 7.4MB 43.9MB/s 
+Requirement already satisfied: toml in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (0.10.2)
+Collecting validators
+  Downloading https://files.pythonhosted.org/packages/db/2f/7fed3ee94ad665ad2c1de87f858f10a7785251ff75b4fd47987888d07ef1/validators-0.18.2-py3-none-any.whl
+Requirement already satisfied: pillow>=6.2.0 in /usr/local/lib/python3.7/dist-packages (from streamlit==0.52.1->-r requirements.txt (line 5)) (7.1.2)
+Requirement already satisfied: requests-oauthlib>=0.7.0 in /usr/local/lib/python3.7/dist-packages (from tweepy==3.10.0->-r requirements.txt (line 7)) (1.3.0)
+Requirement already satisfied: Werkzeug>=0.15 in /usr/local/lib/python3.7/dist-packages (from flask==1.1.2->-r requirements.txt (line 9)) (1.0.1)
+Requirement already satisfied: itsdangerous>=0.24 in /usr/local/lib/python3.7/dist-packages (from flask==1.1.2->-r requirements.txt (line 9)) (1.1.0)
+Requirement already satisfied: Jinja2>=2.10.1 in /usr/local/lib/python3.7/dist-packages (from flask==1.1.2->-r requirements.txt (line 9)) (2.11.3)
+Requirement already satisfied: pytz>=2017.3 in /usr/local/lib/python3.7/dist-packages (from pandas==1.2.2->-r requirements.txt (line 10)) (2018.9)
+Requirement already satisfied: cycler>=0.10 in /usr/local/lib/python3.7/dist-packages (from matplotlib==3.2->-r requirements.txt (line 11)) (0.10.0)
+Requirement already satisfied: pyparsing!=2.0.4,!=2.1.2,!=2.1.6,>=2.0.1 in /usr/local/lib/python3.7/dist-packages (from matplotlib==3.2->-r requirements.txt (line 11)) (2.4.7)
+Requirement already satisfied: kiwisolver>=1.0.1 in /usr/local/lib/python3.7/dist-packages (from matplotlib==3.2->-r requirements.txt (line 11)) (1.3.1)
+Collecting threadpoolctl>=2.0.0
+  Downloading https://files.pythonhosted.org/packages/f7/12/ec3f2e203afa394a149911729357aa48affc59c20e2c1c8297a60f33f133/threadpoolctl-2.1.0-py3-none-any.whl
+Requirement already satisfied: patsy>=0.5 in /usr/local/lib/python3.7/dist-packages (from statsmodels==0.12.2->-r requirements.txt (line 13)) (0.5.1)
+Requirement already satisfied: multitasking>=0.0.7 in /usr/local/lib/python3.7/dist-packages (from yfinance==0.1.54->-r requirements.txt (line 14)) (0.0.9)
+Collecting aiohttp
+  Downloading https://files.pythonhosted.org/packages/88/c0/5890b4c8b04a79b7360e8fe4490feb0bb3ab179743f199f0e6220cebd568/aiohttp-3.7.4.post0-cp37-cp37m-manylinux2014_x86_64.whl (1.3MB)
+     |████████████████████████████████| 1.3MB 35.8MB/s 
+Requirement already satisfied: markdown>=2.6.8 in /usr/local/lib/python3.7/dist-packages (from tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (3.3.4)
+Requirement already satisfied: google-auth<2,>=1.6.3 in /usr/local/lib/python3.7/dist-packages (from tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (1.28.0)
+Requirement already satisfied: tensorboard-plugin-wit>=1.6.0 in /usr/local/lib/python3.7/dist-packages (from tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (1.8.0)
+Requirement already satisfied: setuptools>=41.0.0 in /usr/local/lib/python3.7/dist-packages (from tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (54.2.0)
+Requirement already satisfied: google-auth-oauthlib<0.5,>=0.4.1 in /usr/local/lib/python3.7/dist-packages (from tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (0.4.3)
+Requirement already satisfied: chardet<4,>=3.0.2 in /usr/local/lib/python3.7/dist-packages (from requests->streamlit==0.52.1->-r requirements.txt (line 5)) (3.0.4)
+Requirement already satisfied: certifi>=2017.4.17 in /usr/local/lib/python3.7/dist-packages (from requests->streamlit==0.52.1->-r requirements.txt (line 5)) (2020.12.5)
+Requirement already satisfied: urllib3!=1.25.0,!=1.25.1,<1.26,>=1.21.1 in /usr/local/lib/python3.7/dist-packages (from requests->streamlit==0.52.1->-r requirements.txt (line 5)) (1.24.3)
+Requirement already satisfied: idna<3,>=2.5 in /usr/local/lib/python3.7/dist-packages (from requests->streamlit==0.52.1->-r requirements.txt (line 5)) (2.10)
+Requirement already satisfied: jsonschema in /usr/local/lib/python3.7/dist-packages (from altair>=3.2.0->streamlit==0.52.1->-r requirements.txt (line 5)) (2.6.0)
+Requirement already satisfied: toolz in /usr/local/lib/python3.7/dist-packages (from altair>=3.2.0->streamlit==0.52.1->-r requirements.txt (line 5)) (0.11.1)
+Requirement already satisfied: entrypoints in /usr/local/lib/python3.7/dist-packages (from altair>=3.2.0->streamlit==0.52.1->-r requirements.txt (line 5)) (0.3)
+Collecting jmespath<1.0.0,>=0.7.1
+  Downloading https://files.pythonhosted.org/packages/07/cb/5f001272b6faeb23c1c9e0acc04d48eaaf5c862c17709d20e3469c6e0139/jmespath-0.10.0-py2.py3-none-any.whl
+Collecting s3transfer<0.4.0,>=0.3.0
+  Downloading https://files.pythonhosted.org/packages/98/14/0b4be62b65c52d6d1c442f24e02d2a9889a73d3c352002e14c70f84a679f/s3transfer-0.3.6-py2.py3-none-any.whl (73kB)
+     |████████████████████████████████| 81kB 6.3MB/s 
+Requirement already satisfied: decorator>=3.4.0 in /usr/local/lib/python3.7/dist-packages (from validators->streamlit==0.52.1->-r requirements.txt (line 5)) (4.4.2)
+Requirement already satisfied: oauthlib>=3.0.0 in /usr/local/lib/python3.7/dist-packages (from requests-oauthlib>=0.7.0->tweepy==3.10.0->-r requirements.txt (line 7)) (3.1.0)
+Requirement already satisfied: MarkupSafe>=0.23 in /usr/local/lib/python3.7/dist-packages (from Jinja2>=2.10.1->flask==1.1.2->-r requirements.txt (line 9)) (1.1.1)
+Collecting multidict<7.0,>=4.5
+  Downloading https://files.pythonhosted.org/packages/7c/a6/4123b8165acbe773d1a8dc8e3f0d1edea16d29f7de018eda769abb56bd30/multidict-5.1.0-cp37-cp37m-manylinux2014_x86_64.whl (142kB)
+     |████████████████████████████████| 143kB 37.1MB/s 
+Collecting async-timeout<4.0,>=3.0
+  Downloading https://files.pythonhosted.org/packages/e1/1e/5a4441be21b0726c4464f3f23c8b19628372f606755a9d2e46c187e65ec4/async_timeout-3.0.1-py3-none-any.whl
+Requirement already satisfied: attrs>=17.3.0 in /usr/local/lib/python3.7/dist-packages (from aiohttp->alpha_vantage==2.3.1->-r requirements.txt (line 15)) (20.3.0)
+Collecting yarl<2.0,>=1.0
+  Downloading https://files.pythonhosted.org/packages/f1/62/046834c5fc998c88ab2ef722f5d42122230a632212c8afa76418324f53ff/yarl-1.6.3-cp37-cp37m-manylinux2014_x86_64.whl (294kB)
+     |████████████████████████████████| 296kB 30.9MB/s 
+Requirement already satisfied: importlib-metadata; python_version < "3.8" in /usr/local/lib/python3.7/dist-packages (from markdown>=2.6.8->tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (3.8.1)
+Requirement already satisfied: pyasn1-modules>=0.2.1 in /usr/local/lib/python3.7/dist-packages (from google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (0.2.8)
+Requirement already satisfied: rsa<5,>=3.1.4; python_version >= "3.6" in /usr/local/lib/python3.7/dist-packages (from google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (4.7.2)
+Requirement already satisfied: cachetools<5.0,>=2.0.0 in /usr/local/lib/python3.7/dist-packages (from google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (4.2.1)
+Requirement already satisfied: zipp>=0.5 in /usr/local/lib/python3.7/dist-packages (from importlib-metadata; python_version < "3.8"->markdown>=2.6.8->tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (3.4.1)
+Requirement already satisfied: pyasn1<0.5.0,>=0.4.6 in /usr/local/lib/python3.7/dist-packages (from pyasn1-modules>=0.2.1->google-auth<2,>=1.6.3->tensorboard~=2.4->tensorflow==2.4.1->-r requirements.txt (line 1)) (0.4.8)
+Building wheels for collected packages: nltk, yfinance, tweet-preprocessor, blinker
+  Building wheel for nltk (setup.py) ... done
+  Created wheel for nltk: filename=nltk-3.5-cp37-none-any.whl size=1434674 sha256=bf45fd02e7d9a85fa4c52e2f3db07ee159457615a66835708b6dcf77d71bf9a8
+  Stored in directory: /root/.cache/pip/wheels/ae/8c/3f/b1fe0ba04555b08b57ab52ab7f86023639a526d8bc8d384306
+  Building wheel for yfinance (setup.py) ... done
+  Created wheel for yfinance: filename=yfinance-0.1.54-py2.py3-none-any.whl size=22410 sha256=5a8bcd902e02c6ec6e5add26b0fa37ea288babd2e7e33b68508dfdbb33c016d2
+  Stored in directory: /root/.cache/pip/wheels/f9/e3/5b/ec24dd2984b12d61e0abf26289746c2436a0e7844f26f2515c
+  Building wheel for tweet-preprocessor (setup.py) ... done
+  Created wheel for tweet-preprocessor: filename=tweet_preprocessor-0.5.0-cp37-none-any.whl size=8058 sha256=f639c35322d62a3cf7cb08539883ecdd848c96b59928aca442a0594afd194b4b
+  Stored in directory: /root/.cache/pip/wheels/8c/2d/f9/d7385f53a1708247a9ad1399b20e9cd54812af8f8e63978ed5
+  Building wheel for blinker (setup.py) ... done
+  Created wheel for blinker: filename=blinker-1.4-cp37-none-any.whl size=13448 sha256=0a3603d67bea4738edd542e0492ccaba447cbb1c4718aeb909f120add04ad5a4
+  Stored in directory: /root/.cache/pip/wheels/92/a0/00/8690a57883956a301d91cf4ec999cc0b258b01e3f548f86e89
+Successfully built nltk yfinance tweet-preprocessor blinker
+ERROR: google-colab 1.0.0 has requirement pandas~=1.1.0; python_version >= "3.0", but you'll have pandas 1.2.2 which is incompatible.
+ERROR: albumentations 0.1.12 has requirement imgaug<0.2.7,>=0.2.5, but you'll have imgaug 0.2.9 which is incompatible.
+ERROR: botocore 1.20.47 has requirement urllib3<1.27,>=1.25.4, but you'll have urllib3 1.24.3 which is incompatible.
+Installing collected packages: nltk, watchdog, blinker, enum-compat, python-dateutil, pandas, base58, jmespath, botocore, s3transfer, boto3, validators, streamlit, matplotlib, threadpoolctl, scikit-learn, statsmodels, yfinance, multidict, async-timeout, yarl, aiohttp, alpha-vantage, tweet-preprocessor
+  Found existing installation: nltk 3.2.5
+    Uninstalling nltk-3.2.5:
+      Successfully uninstalled nltk-3.2.5
+  Found existing installation: python-dateutil 2.8.1
+    Uninstalling python-dateutil-2.8.1:
+      Successfully uninstalled python-dateutil-2.8.1
+  Found existing installation: pandas 1.1.5
+    Uninstalling pandas-1.1.5:
+      Successfully uninstalled pandas-1.1.5
+  Found existing installation: matplotlib 3.2.2
+    Uninstalling matplotlib-3.2.2:
+      Successfully uninstalled matplotlib-3.2.2
+  Found existing installation: scikit-learn 0.22.2.post1
+    Uninstalling scikit-learn-0.22.2.post1:
+      Successfully uninstalled scikit-learn-0.22.2.post1
+  Found existing installation: statsmodels 0.10.2
+    Uninstalling statsmodels-0.10.2:
+      Successfully uninstalled statsmodels-0.10.2
+Successfully installed aiohttp-3.7.4.post0 alpha-vantage-2.3.1 async-timeout-3.0.1 base58-2.1.0 blinker-1.4 boto3-1.17.47 botocore-1.20.47 enum-compat-0.0.3 jmespath-0.10.0 matplotlib-3.2.0 multidict-5.1.0 nltk-3.5 pandas-1.2.2 python-dateutil-2.8.0 s3transfer-0.3.6 scikit-learn-0.24.1 statsmodels-0.12.2 streamlit-0.52.1 threadpoolctl-2.1.0 tweet-preprocessor-0.5.0 validators-0.18.2 watchdog-2.0.2 yarl-1.6.3 yfinance-0.1.54
+In [ ]:
+import warnings
+warnings.filterwarnings("ignore")
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+In [ ]:
+#**************** FUNCTIONS TO FETCH DATA ***************************
+def get_historical(quote):
+    end = datetime.now()
+    start = datetime(end.year-2,end.month,end.day)
+    data = yf.download(quote, start=start, end=end)
+    df = pd.DataFrame(data=data)
+    df.to_csv(''+quote+'.csv')
+    if(df.empty):
+        ts = TimeSeries(key='I0TWC260RP30RMO5',output_format='pandas')
+        data, meta_data = ts.get_daily_adjusted(symbol='NSE:'+quote, outputsize='full')
+        #Format df
+        #Last 2 yrs rows => 502, in ascending order => ::-1
+        data=data.head(503).iloc[::-1]
+        data=data.reset_index()
+        #Keep Required cols only
+        df=pd.DataFrame()
+        df['Date']=data['date']
+        df['Open']=data['1. open']
+        df['High']=data['2. high']
+        df['Low']=data['3. low']
+        df['Close']=data['4. close']
+        df['Adj Close']=data['5. adjusted close']
+        df['Volume']=data['6. volume']
+        df.to_csv(''+quote+'.csv',index=False)
+    return
+# This is formatted as code
+In [ ]:
+#******************** ARIMA SECTION ********************
+def ARIMA_ALGO(df):
+    uniqueVals = df["Code"].unique()  
+    len(uniqueVals)
+    df=df.set_index("Code")
+    #for daily basis
+    def parser(x):
+        return datetime.strptime(x, '%Y-%m-%d')
+    def arima_model(train, test):
+        history = [x for x in train]
+        predictions = list()
+        for t in range(len(test)):
+            model = ARIMA(history, order=(6,1 ,0))
+            model_fit = model.fit(disp=0)
+            output = model_fit.forecast()
+            yhat = output[0]
+            predictions.append(yhat[0])
+            obs = test[t]
+            history.append(obs)
+        return predictions
+    for company in uniqueVals[:10]:
+        data=(df.loc[company,:]).reset_index()
+        data['Price'] = data['Close']
+        Quantity_date = data[['Price','Date']]
+        Quantity_date.index = Quantity_date['Date'].map(lambda x: parser(x))
+        Quantity_date['Price'] = Quantity_date['Price'].map(lambda x: float(x))
+        Quantity_date = Quantity_date.fillna(Quantity_date.bfill())
+        Quantity_date = Quantity_date.drop(['Date'],axis =1)
+        fig = plt.figure(figsize=(7.2,4.8),dpi=65)
+        plt.plot(Quantity_date)
+        #plt.savefig('Trends.png')
+        #plt.close(fig)
+        
+        quantity = Quantity_date.values
+        size = int(len(quantity) * 0.80)
+        train, test = quantity[0:size], quantity[size:len(quantity)]
+        #fit in model
+        predictions = arima_model(train, test)
+        
+        #plot graph
+        fig = plt.figure(figsize=(7.2,4.8),dpi=65)
+        plt.plot(test,label='Actual Price')
+        plt.plot(predictions,label='Predicted Price')
+        plt.legend(loc=4)
+        #plt.savefig('ARIMA.png')
+        #plt.close(fig)
+        print()
+        print("##############################################################################")
+        arima_pred=predictions[-2]
+        print("Tomorrow's",quote," Closing Price Prediction by ARIMA:",arima_pred)
+        #rmse calculation
+        error_arima = math.sqrt(mean_squared_error(test, predictions))
+        print("ARIMA RMSE:",error_arima)
+        print("##############################################################################")
+        return arima_pred, error_arima
+In [ ]:
+#************* LSTM SECTION **********************
+
+def LSTM_ALGO(df):
+    #Split data into training set and test set
+    dataset_train=df.iloc[0:int(0.8*len(df)),:]
+    dataset_test=df.iloc[int(0.8*len(df)):,:]
+    ############# NOTE #################
+    #TO PREDICT STOCK PRICES OF NEXT N DAYS, STORE PREVIOUS N DAYS IN MEMORY WHILE TRAINING
+    # HERE N=7
+    ###dataset_train=pd.read_csv('Google_Stock_Price_Train.csv')
+    training_set=df.iloc[:,4:5].values# 1:2, to store as numpy array else Series obj will be stored
+    #select cols using above manner to select as float64 type, view in var explorer
+
+    #Feature Scaling
+    from sklearn.preprocessing import MinMaxScaler
+    sc=MinMaxScaler(feature_range=(0,1))#Scaled values btween 0,1
+    training_set_scaled=sc.fit_transform(training_set)
+    #In scaling, fit_transform for training, transform for test
+    
+    #Creating data stucture with 7 timesteps and 1 output. 
+    #7 timesteps meaning storing trends from 7 days before current day to predict 1 next output
+    X_train=[]#memory with 7 days from day i
+    y_train=[]#day i
+    for i in range(7,len(training_set_scaled)):
+        X_train.append(training_set_scaled[i-7:i,0])
+        y_train.append(training_set_scaled[i,0])
+    #Convert list to numpy arrays
+    X_train=np.array(X_train)
+    y_train=np.array(y_train)
+    X_forecast=np.array(X_train[-1,1:])
+    X_forecast=np.append(X_forecast,y_train[-1])
+    #Reshaping: Adding 3rd dimension
+    X_train=np.reshape(X_train, (X_train.shape[0],X_train.shape[1],1))#.shape 0=row,1=col
+    X_forecast=np.reshape(X_forecast, (1,X_forecast.shape[0],1))
+    #For X_train=np.reshape(no. of rows/samples, timesteps, no. of cols/features)
+    
+    #Building RNN
+    from keras.models import Sequential
+    from keras.layers import Dense
+    from keras.layers import Dropout
+    from keras.layers import LSTM
+    
+    #Initialise RNN
+    regressor=Sequential()
+    
+    #Add first LSTM layer
+    regressor.add(LSTM(units=50,return_sequences=True,input_shape=(X_train.shape[1],1)))
+    #units=no. of neurons in layer
+    #input_shape=(timesteps,no. of cols/features)
+    #return_seq=True for sending recc memory. For last layer, retrun_seq=False since end of the line
+    regressor.add(Dropout(0.1))
+    
+    #Add 2nd LSTM layer
+    regressor.add(LSTM(units=50,return_sequences=True))
+    regressor.add(Dropout(0.1))
+    
+    #Add 3rd LSTM layer
+    regressor.add(LSTM(units=50,return_sequences=True))
+    regressor.add(Dropout(0.1))
+    
+    #Add 4th LSTM layer
+    regressor.add(LSTM(units=50))
+    regressor.add(Dropout(0.1))
+    
+    #Add o/p layer
+    regressor.add(Dense(units=1))
+    
+    #Compile
+    regressor.compile(optimizer='adam',loss='mean_squared_error')
+    
+    #Training
+    regressor.fit(X_train,y_train,epochs=25,batch_size=32 )
+    #For lstm, batch_size=power of 2
+    
+    #Testing
+    ###dataset_test=pd.read_csv('Google_Stock_Price_Test.csv')
+    real_stock_price=dataset_test.iloc[:,4:5].values
+    
+    #To predict, we need stock prices of 7 days before the test set
+    #So combine train and test set to get the entire data set
+    dataset_total=pd.concat((dataset_train['Close'],dataset_test['Close']),axis=0) 
+    testing_set=dataset_total[ len(dataset_total) -len(dataset_test) -7: ].values
+    testing_set=testing_set.reshape(-1,1)
+    #-1=till last row, (-1,1)=>(80,1). otherwise only (80,0)
+    
+    #Feature scaling
+    testing_set=sc.transform(testing_set)
+    
+    #Create data structure
+    X_test=[]
+    for i in range(7,len(testing_set)):
+        X_test.append(testing_set[i-7:i,0])
+        #Convert list to numpy arrays
+    X_test=np.array(X_test)
+    
+    #Reshaping: Adding 3rd dimension
+    X_test=np.reshape(X_test, (X_test.shape[0],X_test.shape[1],1))
+    
+    #Testing Prediction
+    predicted_stock_price=regressor.predict(X_test)
+    
+    #Getting original prices back from scaled values
+    predicted_stock_price=sc.inverse_transform(predicted_stock_price)
+    fig = plt.figure(figsize=(7.2,4.8),dpi=65)
+    plt.plot(real_stock_price,label='Actual Price')  
+    plt.plot(predicted_stock_price,label='Predicted Price')      
+    plt.legend(loc=4)
+    
+    #plt.savefig('static/LSTM.png')
+    #plt.close(fig)
+    
+    
+    error_lstm = math.sqrt(mean_squared_error(real_stock_price, predicted_stock_price))
+    
+    
+    #Forecasting Prediction
+    forecasted_stock_price=regressor.predict(X_forecast)
+    
+    #Getting original prices back from scaled values
+    forecasted_stock_price=sc.inverse_transform(forecasted_stock_price)
+    
+    lstm_pred=forecasted_stock_price[0,0]
+    print()
+    print("##############################################################################")
+    print("Tomorrow's ",quote," Closing Price Prediction by LSTM: ",lstm_pred)
+    print("LSTM RMSE:",error_lstm)
+    print("##############################################################################")
+    return lstm_pred,error_lstm
+In [ ]:
+#***************** LINEAR REGRESSION SECTION ******************       
+def LIN_REG_ALGO(df):
+    #No of days to be forcasted in future
+    forecast_out = int(7)
+    #Price after n days
+    df['Close after n days'] = df['Close'].shift(-forecast_out)
+    #New df with only relevant data
+    df_new=df[['Close','Close after n days']]
+
+    #Structure data for train, test & forecast
+    #lables of known data, discard last 35 rows
+    y =np.array(df_new.iloc[:-forecast_out,-1])
+    y=np.reshape(y, (-1,1))
+    #all cols of known data except lables, discard last 35 rows
+    X=np.array(df_new.iloc[:-forecast_out,0:-1])
+    #Unknown, X to be forecasted
+    X_to_be_forecasted=np.array(df_new.iloc[-forecast_out:,0:-1])
+    
+    #Traning, testing to plot graphs, check accuracy
+    X_train=X[0:int(0.8*len(df)),:]
+    X_test=X[int(0.8*len(df)):,:]
+    y_train=y[0:int(0.8*len(df)),:]
+    y_test=y[int(0.8*len(df)):,:]
+    
+    # Feature Scaling===Normalization
+    from sklearn.preprocessing import StandardScaler
+    sc = StandardScaler()
+    X_train = sc.fit_transform(X_train)
+    X_test = sc.transform(X_test)
+    
+    X_to_be_forecasted=sc.transform(X_to_be_forecasted)
+    
+    #Training
+    clf = LinearRegression(n_jobs=-1)
+    clf.fit(X_train, y_train)
+    
+    #Testing
+    y_test_pred=clf.predict(X_test)
+    y_test_pred=y_test_pred*(1.04)
+    import matplotlib.pyplot as plt2
+    fig = plt2.figure(figsize=(7.2,4.8),dpi=65)
+    plt2.plot(y_test,label='Actual Price' )
+    plt2.plot(y_test_pred,label='Predicted Price')
+    
+    plt2.legend(loc=4)
+
+    #plt2.savefig('static/LR.png')
+    #plt2.close(fig)
+    
+    error_lr = math.sqrt(mean_squared_error(y_test, y_test_pred))
+    
+    
+    #Forecasting
+    forecast_set = clf.predict(X_to_be_forecasted)
+    forecast_set=forecast_set*(1.04)
+    mean=forecast_set.mean()
+    lr_pred=forecast_set[0,0]
+    print()
+    print("##############################################################################")
+    print("Tomorrow's ",quote," Closing Price Prediction by Linear Regression: ",lr_pred)
+    print("Linear Regression RMSE:",error_lr)
+    print("##############################################################################")
+    return df, lr_pred, forecast_set, mean, error_lr
+In [ ]:
+quote = 'BOE.L'
+In [ ]:
+get_historical(quote)
+#************** PREPROCESSING ***********************
+df = pd.read_csv(''+quote+'.csv')
+print("##############################################################################")
+print("Today's",quote,"Stock Data: ")
+today_stock=df.iloc[-1:]
+print(today_stock)
+print("##############################################################################")
+df = df.dropna()
+code_list=[]
+for i in range(0,len(df)):
+    code_list.append(quote)
+df2=pd.DataFrame(code_list,columns=['Code'])
+df2 = pd.concat([df2, df], axis=1)
+df=df2
+[*********************100%***********************]  1 of 1 completed
+##############################################################################
+Today's BOE.L Stock Data: 
+           Date        Open        High         Low  Close  Adj Close  Volume
+504  2021-04-07  254.910004  255.280701  250.929993  258.5      258.5   11196
+##############################################################################
+In [ ]:
+arima_pred, error_arima=ARIMA_ALGO(df)
+##############################################################################
+Tomorrow's BOE.L  Closing Price Prediction by ARIMA: 259.1568924815567
+ARIMA RMSE: 7.358341546772942
+##############################################################################
+
+
+In [ ]:
+lstm_pred, error_lstm=LSTM_ALGO(df)
+Epoch 1/25
+16/16 [==============================] - 9s 20ms/step - loss: 0.2732
+Epoch 2/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0506
+Epoch 3/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0213
+Epoch 4/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0088
+Epoch 5/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0055
+Epoch 6/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0070
+Epoch 7/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0064
+Epoch 8/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0075
+Epoch 9/25
+16/16 [==============================] - 0s 22ms/step - loss: 0.0077
+Epoch 10/25
+16/16 [==============================] - 0s 18ms/step - loss: 0.0057
+Epoch 11/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0066
+Epoch 12/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0055
+Epoch 13/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0067
+Epoch 14/25
+16/16 [==============================] - 0s 18ms/step - loss: 0.0051
+Epoch 15/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0060
+Epoch 16/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0060
+Epoch 17/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0063
+Epoch 18/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0058
+Epoch 19/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0059
+Epoch 20/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0066
+Epoch 21/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0076
+Epoch 22/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0068
+Epoch 23/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0060
+Epoch 24/25
+16/16 [==============================] - 0s 19ms/step - loss: 0.0057
+Epoch 25/25
+16/16 [==============================] - 0s 20ms/step - loss: 0.0061
+
+##############################################################################
+Tomorrow's  BOE.L  Closing Price Prediction by LSTM:  237.79263
+LSTM RMSE: 12.660573477873198
+##############################################################################
+
+In [ ]:
+df, lr_pred, forecast_set,mean,error_lr=LIN_REG_ALGO(df)
+##############################################################################
+Tomorrow's  BOE.L  Closing Price Prediction by Linear Regression:  254.70342539732232
+Linear Regression RMSE: 15.1575392313805
+##############################################################################
+
+In [ ]:
+#Twitter API credentials
+consumer_key= 'J8byEqCJVeadFYXaXXpxB0XPA'
+consumer_secret= 'BtCnypxBLpOcjmH40o6sdeFkVtkEVN9ETZVj0fjLyR6kBMAduJ'
+
+access_token='593352028-586dxldnHIrPKM2aSfsq0yJBwe9ulEQNk6LWMlln'
+access_token_secret='JOnyIQx4oiR96Sp72vMQwZFJRdoOy2dtCXZqS7kbyrV2k'
+
+num_of_tweets = int(300)
+In [ ]:
+#Setting up modules for Tweepy
+import tweepy
+from textblob import TextBlob
+import nltk
+nltk.download('punkt')
+class Tweet(object):
+
+    def __init__(self, content, polarity):
+        self.content = content
+        self.polarity = polarity
+[nltk_data] Downloading package punkt to /root/nltk_data...
+[nltk_data]   Unzipping tokenizers/punkt.zip.
+In [ ]:
+#------------SENTIMENT ANALYSIS------------------
+def retrieving_tweets_polarity(symbol):
+    stock_ticker_map = pd.read_csv('Yahoo-Finance-Ticker-Symbols.csv')
+    stock_full_form = stock_ticker_map[stock_ticker_map['Ticker']==symbol]
+    symbol = stock_full_form['Name'].to_list()[0][0:12]
+
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+    user = tweepy.API(auth)
+    
+    tweets = tweepy.Cursor(user.search, q=symbol, tweet_mode='extended', lang='en',exclude_replies=True).items(num_of_tweets)
+    
+    tweet_list = [] #List of tweets alongside polarity
+    global_polarity = 0 #Polarity of all tweets === Sum of polarities of individual tweets
+    tw_list=[] #List of tweets only => to be displayed on web page
+    #Count Positive, Negative to plot pie chart
+    pos=0 #Num of pos tweets
+    neg=1 #Num of negative tweets
+    for tweet in tweets:
+        count=20 #Num of tweets to be displayed on web page
+        #Convert to Textblob format for assigning polarity
+        tw2 = tweet.full_text
+        tw = tweet.full_text
+        #Clean
+        tw=p.clean(tw)
+        #print("-------------------------------CLEANED TWEET-----------------------------")
+        #print(tw)
+        #Replace &amp; by &
+        tw=re.sub('&amp;','&',tw)
+        #Remove :
+        tw=re.sub(':','',tw)
+        #print("-------------------------------TWEET AFTER REGEX MATCHING-----------------------------")
+        #print(tw)
+        #Remove Emojis and Hindi Characters
+        tw=tw.encode('ascii', 'ignore').decode('ascii')
+
+        #print("-------------------------------TWEET AFTER REMOVING NON ASCII CHARS-----------------------------")
+        #print(tw)
+        blob = TextBlob(tw)
+        polarity = 0 #Polarity of single individual tweet
+        for sentence in blob.sentences:
+                
+            polarity += sentence.sentiment.polarity
+            if polarity>0:
+                pos=pos+1
+            if polarity<0:
+                neg=neg+1
+            
+            global_polarity += sentence.sentiment.polarity
+        if count > 0:
+            tw_list.append(tw2)
+            
+        tweet_list.append(Tweet(tw, polarity))
+        count=count-1
+    if len(tweet_list) != 0:
+        global_polarity = global_polarity / len(tweet_list)
+    else:
+        global_polarity = global_polarity
+    neutral=num_of_tweets-pos-neg
+    if neutral<0:
+      neg=neg+neutral
+      neutral=20
+    print()
+    print("##############################################################################")
+    print("Positive Tweets :",pos,"Negative Tweets :",neg,"Neutral Tweets :",neutral)
+    print("##############################################################################")
+    labels=['Positive','Negative','Neutral']
+    sizes = [pos,neg,neutral]
+    explode = (0, 0, 0)
+    fig = plt.figure(figsize=(7.2,4.8),dpi=65)
+    fig1, ax1 = plt.subplots(figsize=(7.2,4.8),dpi=65)
+    ax1.pie(sizes, explode=explode, labels=labels, autopct='%1.1f%%', startangle=90)
+    # Equal aspect ratio ensures that pie is drawn as a circle
+    ax1.axis('equal')  
+    plt.tight_layout()
+    #plt.savefig('static/SA.png')
+    #plt.close(fig)
+    plt.show()
+    if global_polarity>0:
+        print()
+        print("##############################################################################")
+        print("Tweets Polarity: Overall Positive")
+        print("##############################################################################")
+        tw_pol="Overall Positive"
+    else:
+        print()
+        print("##############################################################################")
+        print("Tweets Polarity: Overall Negative")
+        print("##############################################################################")
+        tw_pol="Overall Negative"
+    
+    
+    return global_polarity,tw_list,tw_pol,pos,neg,neutral
+In [ ]:
+#---------RECOMENDATIONS BASED ON TWEETS & Models-------------------
+def recommending(df, global_polarity,today_stock,mean):
+    if today_stock.iloc[-1]['Close'] < mean:
+        if global_polarity > 0:
+            idea="RISE"
+            decision="BUY"
+            print()
+            print("##############################################################################")
+            print("According to the ML Predictions and Sentiment Analysis of Tweets, a",idea,"in",quote,"stock is expected => ",decision)
+        elif global_polarity <= 0:
+            idea="FALL"
+            decision="SELL"
+            print()
+            print("##############################################################################")
+            print("According to the ML Predictions and Sentiment Analysis of Tweets, a",idea,"in",quote,"stock is expected => ",decision)
+    else:
+        idea="FALL"
+        decision="SELL"
+        print()
+        print("##############################################################################")
+        print("According to the ML Predictions and Sentiment Analysis of Tweets, a",idea,"in",quote,"stock is expected => ",decision)
+    return idea, decision
+In [ ]:
+#Showing sentiment analysis
+polarity,tw_list,tw_pol,pos,neg,neutral = retrieving_tweets_polarity(quote)
+##############################################################################
+Positive Tweets : 39 Negative Tweets : 63 Neutral Tweets : 198
+##############################################################################
+<Figure size 468x312 with 0 Axes>
+
+##############################################################################
+Tweets Polarity: Overall Positive
+##############################################################################
+In [ ]:
+idea, decision=recommending(df, polarity,today_stock,mean)
+print()
+print("Forecasted Prices for Next 7 days:")
+print(forecast_set)
+##############################################################################
+According to the ML Predictions and Sentiment Analysis of Tweets, a RISE in BOE.L stock is expected =>  BUY
+
+Forecasted Prices for Next 7 days:
+[[254.7034254 ]
+ [258.46416704]
+ [255.02719534]
+ [265.76152411]
+ [267.15623242]
+ [263.66944645]
+ [266.65812014]]
